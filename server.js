@@ -1,64 +1,24 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 const path = require('path');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+// Wajib! Pakai process.env.PORT
+const PORT = process.env.PORT || 3000;
 
+// Serve folder public untuk frontend
 app.use(express.static(path.join(__dirname, 'public')));
 
-let waitingPlayer = null;
-
-io.on('connection', socket => {
-  socket.on('join', username => {
-    socket.username = username;
-
-    if (waitingPlayer) {
-      const opponent = waitingPlayer;
-      const white = Math.random() > 0.5 ? socket : opponent;
-      const black = white === socket ? opponent : socket;
-
-      white.color = 'white';
-      black.color = 'black';
-
-      white.opponent = black;
-      black.opponent = white;
-
-      white.emit('start', { color: 'white', opponent: black.username });
-      black.emit('start', { color: 'black', opponent: white.username });
-
-      waitingPlayer = null;
-    } else {
-      waitingPlayer = socket;
-      socket.emit('waiting', 'Waiting for opponent...');
-    }
-  });
-
-  socket.on('move', move => {
-    if (socket.opponent) {
-      socket.opponent.emit('move', move);
-    }
-  });
-
-  socket.on('reset', () => {
-    if (socket.opponent) {
-      socket.emit('reset');
-      socket.opponent.emit('reset');
-    }
-  });
-
-  socket.on('disconnect', () => {
-    if (waitingPlayer === socket) waitingPlayer = null;
-    if (socket.opponent) {
-      socket.opponent.emit('reset');
-      socket.opponent.opponent = null;
-    }
-  });
+// Optional, untuk tes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+io.on('connection', (socket) => {
+  console.log('User connected');
+});
+
+http.listen(PORT, () => {
+  console.log('Server running on port', PORT);
 });
